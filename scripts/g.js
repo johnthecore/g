@@ -164,21 +164,51 @@ var GHTMLElement = (function() {
     return GHTMLElement;
 })();
 var GHTMLCanvasElement = (function() {
-    var options = {};
-    function GHTMLCanvasElement() {}
-    GHTMLCanvasElement.prototype.setOptions = function(opts) {
-        options = opts;
-        return this;
-    }
-    GHTMLCanvasElement.prototype.render = function(context) {
-        // console.log(context);
-        // console.log(options);
+    function GHTMLCanvasElement() {
+        var options = {},
+            defaults = {};
+        this.setOptions = function(opts) {
+            options = opts;
+            return this;
+        }
+        this.getOptions = function() {
+            return options;
+        }
+        this.render = function(context) {
+            throw new GError('This is abstract method');
+        }
+        this.setDefault = function(key, value) {
+            defaults[key] = value;
+        }
+        this.getDefault = function(key, defaultReturnValue) {
+            if (defaults.hasOwnProperty(key)) {
+                return defaults[key];
+            }
+            return defaultReturnValue;
+        }
+        this.setDefault('strokeStyle', '#000');
+        this.setDefault('lineWidth', '1');
+        this.setDefault('fillStyle', 'transient');
+        this.setDefault('_drawMethods', ['stroke']);
     }
     return GHTMLCanvasElement;
 })();
 var GHTMLCanvasElementSquare = (function() {
     function GHTMLCanvasElementSquare() {
         GHTMLCanvasElement.call(this);
+        this.render = function(context) {
+            var options = this.getOptions();
+            context.beginPath();
+            context.strokeStyle = options.strokeStyle || this.getDefault('strokeStyle');
+            context.lineWidth = options.lineWidth || this.getDefault('lineWidth');
+            context.fillStyle = options.fillStyle || this.getDefault('fillStyle');
+            context.rect(options.x, options.y, options.width, options.height);
+            context.closePath();
+            var drawMethods = Object.deepExtend(this.getDefault('_drawMethods'), options['_drawMethods']);
+            drawMethods.forEach(function(drawMethodName) {
+                context[drawMethodName]();
+            });
+        }
     }
     GHTMLCanvasElementSquare.extend(GHTMLCanvasElement);
     return GHTMLCanvasElementSquare;
@@ -186,6 +216,19 @@ var GHTMLCanvasElementSquare = (function() {
 var GHTMLCanvasElementCircle = (function() {
     function GHTMLCanvasElementCircle() {
         GHTMLCanvasElement.call(this);
+        this.render = function(context) {
+            var options = this.getOptions();
+            context.beginPath();
+            context.strokeStyle = options.strokeStyle || this.getDefault('strokeStyle');
+            context.lineWidth = options.lineWidth || this.getDefault('lineWidth');
+            context.fillStyle = options.fillStyle || this.getDefault('fillStyle');
+            context.arc(options.x, options.y, options.r, options.sAngle, options.eAngle, options.counterclockwise);
+            context.closePath();
+            var drawMethods = Object.deepExtend(this.getDefault('_drawMethods'), options['_drawMethods']);
+            drawMethods.forEach(function(drawMethodName) {
+                context[drawMethodName]();
+            });
+        }
     }
     GHTMLCanvasElementCircle.extend(GHTMLCanvasElement);
     return GHTMLCanvasElementCircle;
@@ -193,6 +236,21 @@ var GHTMLCanvasElementCircle = (function() {
 var GHTMLCanvasElementPath = (function() {
     function GHTMLCanvasElementPath() {
         GHTMLCanvasElement.call(this);
+        this.render = function(context) {
+            var options = this.getOptions();
+            context.beginPath();
+            context.strokeStyle = options.strokeStyle || this.getDefault('strokeStyle');
+            context.lineWidth = options.lineWidth || this.getDefault('lineWidth');
+            context.fillStyle = options.fillStyle || this.getDefault('fillStyle');
+            for (var k in options.coordinates) {
+                context.lineTo(options.coordinates[k].x, options.coordinates[k].y);
+            }
+            context.closePath();
+            var drawMethods = Object.deepExtend(this.getDefault('_drawMethods'), options['_drawMethods']);
+            drawMethods.forEach(function(drawMethodName) {
+                context[drawMethodName]();
+            });
+        }
     }
     GHTMLCanvasElementPath.extend(GHTMLCanvasElement);
     return GHTMLCanvasElementPath;
@@ -213,20 +271,12 @@ var GHTMLCanvas = (function() {
             y: 0,
             width: 0,
             height: 0,
-            strokeStyle: '' || GConst.read('default').canvas.strokeStyle,
-            fillStyle: '' || GConst.read('default').canvas.fillStyle,
-            lineWidth: '' || GConst.read('default').canvas.lineWidth
+            strokeStyle: undefined,
+            fillStyle: undefined,
+            lineWidth: undefined,
+            _drawMethods: []
         }, opts);
-        // console.log(options);
         canvasStack.push({frame: new GHTMLCanvasElementSquare().setOptions(options)});
-        /*
-        var context = GHTMLElement.prototype.getElement.call(this).getContext('2d');
-        context.beginPath();
-        context.strokeStyle = options.strokeStyle;
-        context.lineWidth = options.lineWidth;
-        context.fillStyle = options.fillStyle;
-        context.rect(options.x, options.y, options.width, options.height);
-        */
         return this;
     }
     GHTMLCanvas.prototype.drawCircle = function(opts) {
@@ -237,44 +287,39 @@ var GHTMLCanvas = (function() {
             sAngle: 0,
             eAngle: 0,
             counterclockwise: 0,
-            strokeStyle: '' || GConst.read('default').canvas.strokeStyle,
-            fillStyle: '' || GConst.read('default').canvas.fillStyle,
-            lineWidth: '' || GConst.read('default').canvas.lineWidth
+            strokeStyle: undefined,
+            fillStyle: undefined,
+            lineWidth: undefined,
+            _drawMethods: []
         }, opts);
-        // console.log(options);
         canvasStack.push({frame: new GHTMLCanvasElementCircle().setOptions(options)});
-        /*
-        var context = GHTMLElement.prototype.getElement.call(this).getContext('2d');
-        context.beginPath();
-        context.strokeStyle = options.strokeStyle;
-        context.lineWidth = options.lineWidth;
-        context.fillStyle = options.fillStyle;
-        context.arc(options.x, options.y, options.r, options.sAngle, options.eAngle, options.counterclockwise);
-        */
         return this;
     }
     GHTMLCanvas.prototype.drawPath = function(opts) {
-        if (!Object.isArray(opts)) {
+        if (!Object.isArray(opts.coordinates) || !opts.coordinates.length) {
             return;
         }
-        // console.log(opts);
+        var options = Object.deepExtend({
+            x: 0,
+            y: 0,
+            r: 0,
+            sAngle: 0,
+            eAngle: 0,
+            counterclockwise: 0,
+            strokeStyle: undefined,
+            fillStyle: undefined,
+            lineWidth: undefined,
+            coordinates: [],
+            _drawMethods: []
+        }, opts);
         canvasStack.push({frame: new GHTMLCanvasElementPath().setOptions(opts)});
-        /*
-        var context = GHTMLElement.prototype.getElement.call(this).getContext('2d');
-        context.beginPath();
-        for (var k in opts) {
-            context.lineTo(opts[k].x, opts[k].y);
-        }
-        */
         return this;
     }
     GHTMLCanvas.prototype.render = function(opts) {
         var context = GHTMLElement.prototype.getElement.call(this).getContext('2d');
-        // console.log(canvasStack);
         for (var k in canvasStack) {
             canvasStack[k].frame.render(context);
         }
-        context.stroke();
         return this;
     }
     return GHTMLCanvas;
