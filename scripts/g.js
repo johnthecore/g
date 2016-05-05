@@ -385,13 +385,6 @@ var G = (function() {
             }
         };
     function G() {
-        GConst.define('default', {
-            canvas: {
-                strokeStyle: '#000',
-                fillStyle: '#000',
-                lineWidth: '1',
-            }
-        });
         GGlobal.set('log', 0);
     }
     G.prototype.setOptions = function(opts) {
